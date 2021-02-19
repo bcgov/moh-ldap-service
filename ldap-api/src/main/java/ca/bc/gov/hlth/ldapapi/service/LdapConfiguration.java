@@ -12,6 +12,9 @@ public class LdapConfiguration {
     @Value("${ldap.provider.url}")
     private String providerUrl;
 
+    @Value("${ldap.security.authentication}")
+    private String securityAuthentication;
+
     @Value("${ldap.security.principal}")
     private String securityPrincipal;
 
@@ -22,7 +25,7 @@ public class LdapConfiguration {
     public Properties ldapProperties() {
         Properties ldapProperties = new Properties();
         ldapProperties.put("java.naming.factory.initial", "com.sun.jndi.ldap.LdapCtxFactory");
-        ldapProperties.put("java.naming.security.authentication", "simple");
+        ldapProperties.put("java.naming.security.authentication", securityAuthentication);
         ldapProperties.put("java.naming.provider.url", providerUrl);
         ldapProperties.put("java.naming.security.principal", securityPrincipal);
         ldapProperties.put("java.naming.security.credentials", securityCredentials);
