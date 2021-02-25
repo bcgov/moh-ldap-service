@@ -72,7 +72,7 @@ public class LdapService {
         return userAuthenticated;
     }
 
-    private Map<String, String> createReturnMessage(String userName, boolean validCredentials, Attributes attributes) {
+    protected Map<String, String> createReturnMessage(String userName, boolean validCredentials, Attributes attributes) {
 
         Map<String, String> returnMessageMap = new HashMap<>();
         returnMessageMap.put("Username", userName);
