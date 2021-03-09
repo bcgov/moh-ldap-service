@@ -21,6 +21,7 @@ public class LdapService {
 
     private final String LDAP_CONST_UNLOCKED = "unlocked";
     private final String LDAP_CONST_ACCOUNT_LOCKED_ATTRIBUTE = "acctlockedflag";
+    private final String LDAP_SEARCH_BASE = "o=hnet,st=bc,c=ca";
 
     public LdapService(Properties ldapProperties) {
         this.ldapProperties = ldapProperties;
@@ -41,7 +42,7 @@ public class LdapService {
             constraints.setSearchScope(2);
             constraints.setCountLimit(300L); // TODO filter out names that could cause a wildcard search
             constraints.setReturningObjFlag(false);
-            NamingEnumeration<SearchResult> results = ctx.search("o=hnet,st=bc,c=ca", "uid=" + username, constraints);
+            NamingEnumeration<SearchResult> results = ctx.search(LDAP_SEARCH_BASE, "uid=" + username, constraints);
             ctx.close();
 
             return results.next();
@@ -57,7 +58,7 @@ public class LdapService {
         boolean userAuthenticated = false;
 
         Properties userLdapProperties = (Properties) ldapProperties.clone();
-        userLdapProperties.put("java.naming.security.principal", userInfoName + ",o=hnet,st=bc,c=ca");
+        userLdapProperties.put("java.naming.security.principal", userInfoName + "," + LDAP_SEARCH_BASE);
         userLdapProperties.put("java.naming.security.credentials", password);
         userLdapProperties.put("com.sun.jndi.ldap.connect.pool", "false");
 
