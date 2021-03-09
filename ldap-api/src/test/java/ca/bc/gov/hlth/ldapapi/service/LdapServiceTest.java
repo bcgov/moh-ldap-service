@@ -19,25 +19,37 @@ public class LdapServiceTest {
 
     @Test
     public void testCreateReturnMessage_authenticatedFalse() {
-        Map<String, String> returnMessageMap = ldapService.createReturnMessage(userName, false, attributesWithRole);
+        Map<String, String> returnMessageMap = ldapService.createReturnMessage(userName, false, true, attributesWithRole);
         assertEquals(userName, returnMessageMap.get("Username"));
         assertEquals("false", returnMessageMap.get("Authenticated"));
+        assertEquals("true", returnMessageMap.get("Unlocked"));
+        assertNull(returnMessageMap.get("gisuserrole"));
+    }
+
+    @Test
+    public void testCreateReturnMessage_authenticatedTrue_userUnlockedFalse() {
+        Map<String, String> returnMessageMap = ldapService.createReturnMessage(userName, true, false, attributesWithRole);
+        assertEquals(userName, returnMessageMap.get("Username"));
+        assertEquals("true", returnMessageMap.get("Authenticated"));
+        assertEquals("false", returnMessageMap.get("Unlocked"));
         assertNull(returnMessageMap.get("gisuserrole"));
     }
 
     @Test
     public void testCreateReturnMessage_authenticatedTrue_RoleFalse() {
-        Map<String, String> returnMessageMap = ldapService.createReturnMessage(userName, true, attributesWithoutRole);
+        Map<String, String> returnMessageMap = ldapService.createReturnMessage(userName, true, true, attributesWithoutRole);
         assertEquals(userName, returnMessageMap.get("Username"));
         assertEquals("true", returnMessageMap.get("Authenticated"));
+        assertEquals("true", returnMessageMap.get("Unlocked"));
         assertNull(returnMessageMap.get("gisuserrole"));
     }
 
     @Test
     public void testCreateReturnMessage_authenticatedTrue_RoleTrue() {
-        Map<String, String> returnMessageMap = ldapService.createReturnMessage(userName, true, attributesWithRole);
+        Map<String, String> returnMessageMap = ldapService.createReturnMessage(userName, true, true, attributesWithRole);
         assertEquals(userName, returnMessageMap.get("Username"));
         assertEquals("true", returnMessageMap.get("Authenticated"));
+        assertEquals("true", returnMessageMap.get("Unlocked"));
         assertEquals("GISUSER", returnMessageMap.get("gisuserrole"));
     }
 }

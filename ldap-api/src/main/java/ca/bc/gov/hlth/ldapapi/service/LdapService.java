@@ -19,6 +19,9 @@ public class LdapService {
     private final Logger webClientLogger = LoggerFactory.getLogger(LdapService.class);
     private final Properties ldapProperties;
 
+    private final String LDAP_CONST_UNLOCKED = "unlocked";
+    private final String LDAP_CONST_ACCOUNT_LOCKED_ATTRIBUTE = "acctlockedflag";
+
     public LdapService(Properties ldapProperties) {
         this.ldapProperties = ldapProperties;
     }
@@ -26,8 +29,9 @@ public class LdapService {
     public Map<String, String> authenticate(String username, String password) {
         SearchResult userInfo = searchUser(username);
         boolean validCredentials = authenticateUser(userInfo.getName(), password);
+        boolean userUnlocked = checkUserLocked(userInfo.getAttributes());
 
-        return createReturnMessage(userInfo.getName(), validCredentials, userInfo.getAttributes());
+        return createReturnMessage(userInfo.getName(), validCredentials, userUnlocked, userInfo.getAttributes());
     }
 
     private SearchResult searchUser(String username) {
@@ -65,19 +69,38 @@ public class LdapService {
             if (e instanceof AuthenticationException) {
                 webClientLogger.info("Failed authentication for user: " + userInfoName);
             } else {
-                e.printStackTrace(); // TODO separate authentication exception from other exceptions
+                e.printStackTrace();
             }
         }
 
         return userAuthenticated;
     }
 
-    protected Map<String, String> createReturnMessage(String userName, boolean validCredentials, Attributes attributes) {
+    private boolean checkUserLocked(Attributes attributes) {
+        Attribute acctLockedFlag = attributes.get(LDAP_CONST_ACCOUNT_LOCKED_ATTRIBUTE);
+        boolean unlocked = true;
+
+        if (acctLockedFlag != null) {
+            try {
+                // If the attribute exists the account is locked in any case except for a value of "unlocked"
+                unlocked = LDAP_CONST_UNLOCKED.equalsIgnoreCase(acctLockedFlag.get().toString());
+            } catch (NamingException e) {
+                e.printStackTrace();
+            }
+        }
+
+        return unlocked;
+    }
+
+    protected Map<String, String> createReturnMessage(String userName, boolean validCredentials, boolean userUnlocked, Attributes attributes) {
 
         Map<String, String> returnMessageMap = new HashMap<>();
         returnMessageMap.put("Username", userName);
         returnMessageMap.put("Authenticated", Boolean.toString(validCredentials));
-        if (validCredentials) {
+        returnMessageMap.put("Unlocked", Boolean.toString(userUnlocked));
+
+        // Role information is only relevant if the user is authenticated and unlocked
+        if (validCredentials && userUnlocked) {
             Attribute gisUserRoleAttribute = attributes.get("gisuserrole");
             if (gisUserRoleAttribute != null) {
                 try {
