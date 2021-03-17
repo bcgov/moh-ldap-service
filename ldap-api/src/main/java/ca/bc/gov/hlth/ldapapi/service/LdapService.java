@@ -25,14 +25,14 @@ public class LdapService {
     private final String LDAP_CONST_UNLOCKED = "unlocked";
     private final String LDAP_CONST_LOCKED = "locked";
     private final String LDAP_CONST_ACCOUNT_LOCKED_ATTRIBUTE = "acctlockedflag";
-    public  final String LDAP_ATTR_ACCT_LOCKED_BY = "acctlockedby";
-    public static String LDAP_ATTR_ACCT_LOCKED_REASON = "acctlockedreason";
+    private final String LDAP_ATTR_ACCT_LOCKED_BY = "acctlockedby";
+    private final String LDAP_ATTR_ACCT_LOCKED_REASON = "acctlockedreason";
     private final String LDAP_SEARCH_BASE = "o=hnet,st=bc,c=ca";
 
     @Value("${ldap.attempt.timeout}")
-    private int attemptTimeout;
+    protected int attemptTimeout;
 
-    private final ConcurrentHashMap<String, LoginAttempts> loginAttemptsMap = new ConcurrentHashMap<>();
+    protected final ConcurrentHashMap<String, LoginAttempts> loginAttemptsMap = new ConcurrentHashMap<>();
 
     public LdapService(Properties ldapProperties) {
         this.ldapProperties = ldapProperties;
@@ -108,7 +108,7 @@ public class LdapService {
         return userAuthenticated;
     }
 
-    private void updateUserFailedLoginAttempts(String userInfoName) {
+    protected void updateUserFailedLoginAttempts(String userInfoName) {
         LoginAttempts loginAttemptsForUser = loginAttemptsMap.get(userInfoName);
         // No entry: add entry, set attempts=1, set timestamp=now
         if (loginAttemptsForUser == null) {
@@ -155,7 +155,7 @@ public class LdapService {
         return userToReturn;
     }
 
-    private void lockUserAccount(String userInfoName) {
+    protected void lockUserAccount(String userInfoName) {
         try {
             DirContext ctx = new InitialDirContext(ldapProperties);
 
@@ -169,6 +169,7 @@ public class LdapService {
             ModificationItem[] changeItems = {lockedItem, lockedReasonItem, lockedByItem};
 
             ctx.modifyAttributes(userInfoName, changeItems);
+            webClientLogger.info("User locked: " + userInfoName);
 
         } catch (NamingException e) {
             webClientLogger.info("Failed to lock user: " + userInfoName);
