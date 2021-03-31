@@ -11,6 +11,7 @@ import javax.naming.AuthenticationException;
 import javax.naming.NamingEnumeration;
 import javax.naming.NamingException;
 import javax.naming.directory.*;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Properties;
@@ -27,6 +28,8 @@ public class LdapService {
     private final String LDAP_CONST_ACCOUNT_LOCKED_ATTRIBUTE = "acctlockedflag";
     private final String LDAP_ATTR_ACCT_LOCKED_BY = "acctlockedby";
     private final String LDAP_ATTR_ACCT_LOCKED_REASON = "acctlockedreason";
+    public  final String LDAP_ATTR_PASSWORD_CHANGE_DATE = "passwordchangedate";
+    public static final String LDAP_ATTR_PASSLIFESPAN = "passlifespan";
     private final String LDAP_SEARCH_BASE = "o=hnet,st=bc,c=ca";
 
     @Value("${ldap.attempt.timeout}")
@@ -41,12 +44,13 @@ public class LdapService {
     public User authenticate(UserCredentials userCredentials) {
         SearchResult userInfo = searchUser(userCredentials.getUserName());
         boolean userUnlocked = checkUserLocked(userInfo.getAttributes());
+        boolean userPasswordExpired = checkUserPasswordExpired(userInfo.getAttributes());
         boolean validCredentials = false;
         if (userUnlocked) {
             validCredentials = authenticateUser(userInfo.getName(), userCredentials.getPassword());
         }
 
-        return createReturnMessage(userInfo.getName(), validCredentials, userUnlocked, userInfo.getAttributes());
+        return createReturnMessage(userInfo.getName(), validCredentials, userUnlocked, userPasswordExpired, userInfo.getAttributes());
     }
 
     private SearchResult searchUser(String username) {
@@ -81,6 +85,36 @@ public class LdapService {
         }
 
         return unlocked;
+    }
+
+    private boolean checkUserPasswordExpired(Attributes attributes) {
+        Attribute passwordChangeDate = attributes.get(LDAP_ATTR_PASSWORD_CHANGE_DATE);
+        Attribute passwordLifespan = attributes.get(LDAP_ATTR_PASSLIFESPAN);
+        boolean expired = false;
+
+        if (passwordChangeDate != null) {
+            try {
+                Long changedDaysAgo = Long.valueOf(passwordChangeDate.get().toString());
+                Long today = LocalDate.now().toEpochDay();
+                expired = (changedDaysAgo + checkPasswordLifespan(passwordLifespan)) < today;
+            } catch (NamingException e) {
+                e.printStackTrace();
+            }
+        }
+
+        return expired;
+    }
+
+    private int checkPasswordLifespan(Attribute passwordLifespan) {
+        Integer lifespan = 42; // Standard password lifespan setting from LDAPAdmin webapp
+        if (passwordLifespan != null) {
+            try {
+                lifespan = Integer.valueOf(passwordLifespan.get().toString());
+            } catch (NamingException e) {
+                e.printStackTrace();
+            }
+        }
+        return lifespan;
     }
 
     private boolean authenticateUser(String userInfoName, String password) {
@@ -133,15 +167,18 @@ public class LdapService {
         }
     }
 
-    protected User createReturnMessage(String userName, boolean validCredentials, boolean userUnlocked, Attributes attributes) {
+    protected User createReturnMessage(String userName, boolean validCredentials, boolean userUnlocked,
+                                       boolean passwordExpired, Attributes attributes) {
 
         User userToReturn = new User();
         userToReturn.setUsername(userName);
         userToReturn.setAuthenticated(validCredentials);
         userToReturn.setUnlocked(userUnlocked);
 
-        // Role information is only relevant if the user is authenticated and unlocked
+        // Role and Expiry information is only relevant if the user is authenticated and unlocked
         if (validCredentials && userUnlocked) {
+            userToReturn.setPasswordExpired(passwordExpired);
+
             Attribute gisUserRoleAttribute = attributes.get("gisuserrole");
             if (gisUserRoleAttribute != null) {
                 try {
