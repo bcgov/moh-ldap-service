@@ -14,6 +14,7 @@ import javax.naming.directory.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.NoSuchElementException;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -23,14 +24,14 @@ public class LdapService {
     private final Logger webClientLogger = LoggerFactory.getLogger(LdapService.class);
     private final Properties ldapProperties;
 
-    private final String LDAP_CONST_UNLOCKED = "unlocked";
-    private final String LDAP_CONST_LOCKED = "locked";
-    private final String LDAP_CONST_ACCOUNT_LOCKED_ATTRIBUTE = "acctlockedflag";
-    private final String LDAP_ATTR_ACCT_LOCKED_BY = "acctlockedby";
-    private final String LDAP_ATTR_ACCT_LOCKED_REASON = "acctlockedreason";
-    public  final String LDAP_ATTR_PASSWORD_CHANGE_DATE = "passwordchangedate";
-    public static final String LDAP_ATTR_PASSLIFESPAN = "passlifespan";
-    private final String LDAP_SEARCH_BASE = "o=hnet,st=bc,c=ca";
+    private static final String LDAP_CONST_UNLOCKED = "unlocked";
+    private static final String LDAP_CONST_LOCKED = "locked";
+    private static final String LDAP_CONST_ACCOUNT_LOCKED_ATTRIBUTE = "acctlockedflag";
+    private static final String LDAP_ATTR_ACCT_LOCKED_BY = "acctlockedby";
+    private static final String LDAP_ATTR_ACCT_LOCKED_REASON = "acctlockedreason";
+    private static final String LDAP_ATTR_PASSWORD_CHANGE_DATE = "passwordchangedate";
+    private static final String LDAP_ATTR_PASSLIFESPAN = "passlifespan";
+    private static final String LDAP_SEARCH_BASE = "o=hnet,st=bc,c=ca";
 
     @Value("${ldap.attempt.timeout}")
     protected int attemptTimeout;
@@ -66,7 +67,7 @@ public class LdapService {
             return results.next();
 
         } catch (NamingException e) {
-            e.printStackTrace(); // TODO separate responses based on exceptions
+            e.printStackTrace(); // TODO separate responses based on exceptions - return 404 user not found
         }
         return null;
     }
@@ -79,11 +80,10 @@ public class LdapService {
             try {
                 // If the attribute exists the account is locked in any case except for a value of "unlocked"
                 unlocked = LDAP_CONST_UNLOCKED.equalsIgnoreCase(acctLockedFlag.get().toString());
-            } catch (NamingException e) {
+            } catch (NamingException e) { // TODO Naming exception should return a 500, NoSuchElementException can be caught
                 e.printStackTrace();
             }
         }
-
         return unlocked;
     }
 
@@ -94,25 +94,23 @@ public class LdapService {
 
         if (passwordChangeDate != null) {
             try {
-                Long changedDaysAgo = Long.valueOf(passwordChangeDate.get().toString());
-                Long today = LocalDate.now().toEpochDay();
-                expired = (changedDaysAgo + checkPasswordLifespan(passwordLifespan)) < today;
-            } catch (NamingException e) {
-                e.printStackTrace();
+                long epochDateLastChangedOn = Long.parseLong(passwordChangeDate.get().toString());
+                long today = LocalDate.now().toEpochDay();
+                expired = (epochDateLastChangedOn + retrievePasswordLifespan(passwordLifespan)) < today;
+            } catch (NamingException | NoSuchElementException e) {
+                /* If we can't get the expired password info we consider expired=false
+                 This is not actually used as part of determining a successful authentication it just suggests for a user
+                 to change their password */
+                webClientLogger.debug(e.getMessage());
             }
         }
-
         return expired;
     }
 
-    private int checkPasswordLifespan(Attribute passwordLifespan) {
-        Integer lifespan = 42; // Standard password lifespan setting from LDAPAdmin webapp
+    private int retrievePasswordLifespan(Attribute passwordLifespan) throws NamingException {
+        int lifespan = 42; // Standard password lifespan setting from LDAPAdmin webapp
         if (passwordLifespan != null) {
-            try {
-                lifespan = Integer.valueOf(passwordLifespan.get().toString());
-            } catch (NamingException e) {
-                e.printStackTrace();
-            }
+            lifespan = Integer.parseInt(passwordLifespan.get().toString());
         }
         return lifespan;
     }
@@ -135,7 +133,7 @@ public class LdapService {
                 updateUserFailedLoginAttempts(userInfoName);
                 webClientLogger.info("Failed authentication for user: " + userInfoName);
             } else {
-                e.printStackTrace();
+                e.printStackTrace(); // TODO we should return a 500 here
             }
         }
 
@@ -184,7 +182,7 @@ public class LdapService {
                 try {
                     userToReturn.setGisuserrole((String) gisUserRoleAttribute.get());
                 } catch (NamingException e) {
-                    e.printStackTrace();
+                    e.printStackTrace(); // TODO we should return a 500 here
                 }
             }
         }
