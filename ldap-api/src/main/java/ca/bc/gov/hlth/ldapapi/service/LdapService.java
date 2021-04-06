@@ -11,8 +11,10 @@ import javax.naming.AuthenticationException;
 import javax.naming.NamingEnumeration;
 import javax.naming.NamingException;
 import javax.naming.directory.*;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.NoSuchElementException;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -22,12 +24,14 @@ public class LdapService {
     private final Logger webClientLogger = LoggerFactory.getLogger(LdapService.class);
     private final Properties ldapProperties;
 
-    private final String LDAP_CONST_UNLOCKED = "unlocked";
-    private final String LDAP_CONST_LOCKED = "locked";
-    private final String LDAP_CONST_ACCOUNT_LOCKED_ATTRIBUTE = "acctlockedflag";
-    private final String LDAP_ATTR_ACCT_LOCKED_BY = "acctlockedby";
-    private final String LDAP_ATTR_ACCT_LOCKED_REASON = "acctlockedreason";
-    private final String LDAP_SEARCH_BASE = "o=hnet,st=bc,c=ca";
+    private static final String LDAP_CONST_UNLOCKED = "unlocked";
+    private static final String LDAP_CONST_LOCKED = "locked";
+    private static final String LDAP_CONST_ACCOUNT_LOCKED_ATTRIBUTE = "acctlockedflag";
+    private static final String LDAP_ATTR_ACCT_LOCKED_BY = "acctlockedby";
+    private static final String LDAP_ATTR_ACCT_LOCKED_REASON = "acctlockedreason";
+    private static final String LDAP_ATTR_PASSWORD_CHANGE_DATE = "passwordchangedate";
+    private static final String LDAP_ATTR_PASSLIFESPAN = "passlifespan";
+    private static final String LDAP_SEARCH_BASE = "o=hnet,st=bc,c=ca";
 
     @Value("${ldap.attempt.timeout}")
     protected int attemptTimeout;
@@ -41,12 +45,13 @@ public class LdapService {
     public User authenticate(UserCredentials userCredentials) {
         SearchResult userInfo = searchUser(userCredentials.getUserName());
         boolean userUnlocked = checkUserLocked(userInfo.getAttributes());
+        boolean userPasswordExpired = checkUserPasswordExpired(userInfo.getAttributes());
         boolean validCredentials = false;
         if (userUnlocked) {
             validCredentials = authenticateUser(userInfo.getName(), userCredentials.getPassword());
         }
 
-        return createReturnMessage(userInfo.getName(), validCredentials, userUnlocked, userInfo.getAttributes());
+        return createReturnMessage(userInfo.getName(), validCredentials, userUnlocked, userPasswordExpired, userInfo.getAttributes());
     }
 
     private SearchResult searchUser(String username) {
@@ -62,7 +67,7 @@ public class LdapService {
             return results.next();
 
         } catch (NamingException e) {
-            e.printStackTrace(); // TODO separate responses based on exceptions
+            e.printStackTrace(); // TODO separate responses based on exceptions - return 404 user not found
         }
         return null;
     }
@@ -75,12 +80,39 @@ public class LdapService {
             try {
                 // If the attribute exists the account is locked in any case except for a value of "unlocked"
                 unlocked = LDAP_CONST_UNLOCKED.equalsIgnoreCase(acctLockedFlag.get().toString());
-            } catch (NamingException e) {
+            } catch (NamingException e) { // TODO Naming exception should return a 500, NoSuchElementException can be caught
                 e.printStackTrace();
             }
         }
-
         return unlocked;
+    }
+
+    private boolean checkUserPasswordExpired(Attributes attributes) {
+        Attribute passwordChangeDate = attributes.get(LDAP_ATTR_PASSWORD_CHANGE_DATE);
+        Attribute passwordLifespan = attributes.get(LDAP_ATTR_PASSLIFESPAN);
+        boolean expired = false;
+
+        if (passwordChangeDate != null) {
+            try {
+                long epochDateLastChangedOn = Long.parseLong(passwordChangeDate.get().toString());
+                long today = LocalDate.now().toEpochDay();
+                expired = (epochDateLastChangedOn + retrievePasswordLifespan(passwordLifespan)) < today;
+            } catch (NamingException | NoSuchElementException e) {
+                /* If we can't get the expired password info we consider expired=false
+                 This is not actually used as part of determining a successful authentication it just suggests for a user
+                 to change their password */
+                webClientLogger.debug(e.getMessage());
+            }
+        }
+        return expired;
+    }
+
+    private int retrievePasswordLifespan(Attribute passwordLifespan) throws NamingException {
+        int lifespan = 42; // Standard password lifespan setting from LDAPAdmin webapp
+        if (passwordLifespan != null) {
+            lifespan = Integer.parseInt(passwordLifespan.get().toString());
+        }
+        return lifespan;
     }
 
     private boolean authenticateUser(String userInfoName, String password) {
@@ -101,7 +133,7 @@ public class LdapService {
                 updateUserFailedLoginAttempts(userInfoName);
                 webClientLogger.info("Failed authentication for user: " + userInfoName);
             } else {
-                e.printStackTrace();
+                e.printStackTrace(); // TODO we should return a 500 here
             }
         }
 
@@ -133,21 +165,24 @@ public class LdapService {
         }
     }
 
-    protected User createReturnMessage(String userName, boolean validCredentials, boolean userUnlocked, Attributes attributes) {
+    protected User createReturnMessage(String userName, boolean validCredentials, boolean userUnlocked,
+                                       boolean passwordExpired, Attributes attributes) {
 
         User userToReturn = new User();
         userToReturn.setUsername(userName);
         userToReturn.setAuthenticated(validCredentials);
         userToReturn.setUnlocked(userUnlocked);
 
-        // Role information is only relevant if the user is authenticated and unlocked
+        // Role and Expiry information is only relevant if the user is authenticated and unlocked
         if (validCredentials && userUnlocked) {
+            userToReturn.setPasswordExpired(passwordExpired);
+
             Attribute gisUserRoleAttribute = attributes.get("gisuserrole");
             if (gisUserRoleAttribute != null) {
                 try {
                     userToReturn.setGisuserrole((String) gisUserRoleAttribute.get());
                 } catch (NamingException e) {
-                    e.printStackTrace();
+                    e.printStackTrace(); // TODO we should return a 500 here
                 }
             }
         }

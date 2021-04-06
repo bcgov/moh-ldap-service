@@ -15,11 +15,11 @@ import static org.mockito.Mockito.*;
 
 public class LdapServiceTest {
 
-    private String userName = "TestUserID";
-    private Attributes attributesWithRole = new BasicAttributes("gisuserrole", "GISUSER");
-    private Attributes attributesWithoutRole = new BasicAttributes();
+    private final String userName = "TestUserID";
+    private final Attributes attributesWithRole = new BasicAttributes("gisuserrole", "GISUSER");
+    private final Attributes attributesWithoutRole = new BasicAttributes();
 
-    private static LdapService ldapService = new LdapService(new Properties());
+    private static final LdapService ldapService = new LdapService(new Properties());
 
     @BeforeAll
     public static void initialSetup() {
@@ -28,37 +28,40 @@ public class LdapServiceTest {
 
     @Test
     public void testCreateReturnMessage_authenticatedFalse() {
-        User returnedUser = ldapService.createReturnMessage(userName, false, true, attributesWithRole);
+        User returnedUser = ldapService.createReturnMessage(userName, false, true, true, attributesWithRole);
         assertEquals(userName, returnedUser.getUsername());
-        assertEquals(false, returnedUser.isAuthenticated());
-        assertEquals(true, returnedUser.isUnlocked());
+        assertFalse(returnedUser.isAuthenticated());
+        assertFalse(returnedUser.isPasswordExpired());
         assertNull(returnedUser.getGisuserrole());
     }
 
     @Test
     public void testCreateReturnMessage_authenticatedTrue_userUnlockedFalse() {
-        User returnedUser = ldapService.createReturnMessage(userName, true, false, attributesWithRole);
+        User returnedUser = ldapService.createReturnMessage(userName, true, false, true, attributesWithRole);
         assertEquals(userName, returnedUser.getUsername());
-        assertEquals(true, returnedUser.isAuthenticated());
-        assertEquals(false, returnedUser.isUnlocked());
+        assertTrue(returnedUser.isAuthenticated());
+        assertFalse(returnedUser.isUnlocked());
+        assertFalse(returnedUser.isPasswordExpired());
         assertNull(returnedUser.getGisuserrole());
     }
 
     @Test
     public void testCreateReturnMessage_authenticatedTrue_RoleFalse() {
-        User returnedUser = ldapService.createReturnMessage(userName, true, true, attributesWithoutRole);
+        User returnedUser = ldapService.createReturnMessage(userName, true, true, false, attributesWithoutRole);
         assertEquals(userName, returnedUser.getUsername());
-        assertEquals(true, returnedUser.isAuthenticated());
-        assertEquals(true, returnedUser.isUnlocked());
+        assertTrue(returnedUser.isAuthenticated());
+        assertTrue(returnedUser.isUnlocked());
+        assertFalse(returnedUser.isPasswordExpired());
         assertNull(returnedUser.getGisuserrole());
     }
 
     @Test
     public void testCreateReturnMessage_authenticatedTrue_RoleTrue() {
-        User returnedUser = ldapService.createReturnMessage(userName, true, true, attributesWithRole);
+        User returnedUser = ldapService.createReturnMessage(userName, true, true, true, attributesWithRole);
         assertEquals(userName, returnedUser.getUsername());
-        assertEquals(true, returnedUser.isAuthenticated());
-        assertEquals(true, returnedUser.isUnlocked());
+        assertTrue(returnedUser.isAuthenticated());
+        assertTrue(returnedUser.isUnlocked());
+        assertTrue(returnedUser.isPasswordExpired());
         assertEquals("GISUSER", returnedUser.getGisuserrole());
     }
 
