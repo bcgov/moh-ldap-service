@@ -54,8 +54,10 @@ public class LdapServiceTest {
         assertFalse(returnedUser.isUnlocked());
         assertFalse(returnedUser.isPasswordExpired());
         assertNull(returnedUser.getGisuserrole());
-        assertEquals(0, returnedUser.getLockoutTimeInHours());
-        assertEquals(0, returnedUser.getRemainingAttempts());
+        assertNull(returnedUser.getLockoutTimeInHours());
+        assertNull(returnedUser.getRemainingAttempts());
+//        assertEquals(0, returnedUser.getLockoutTimeInHours());
+//        assertEquals(0, returnedUser.getRemainingAttempts());
     }
 
     @Test

@@ -202,6 +202,8 @@ public class LdapService {
 
         } else { // Entry Exists, timestamp<1hr, attempts >=3
             lockUserAccount(userInfoName + "," + LDAP_SEARCH_BASE);
+            loginAttemptsForUser.setAttempts(currentAttempts + 1);
+            loginAttemptsForUser.setLastAttempt(LocalDateTime.now());
         }
     }
 
