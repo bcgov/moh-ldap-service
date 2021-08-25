@@ -125,27 +125,6 @@ public class LdapService {
         }
         return expired;
     }
-
-    // TODO
-    private int getNbLoginAttempts(Attributes attributes) {
-        Attribute passwordChangeDate = attributes.get(LDAP_ATTR_PASSWORD_CHANGE_DATE);
-        Attribute passwordLifespan = attributes.get(LDAP_ATTR_PASSLIFESPAN);
-        boolean expired = false;
-
-        if (passwordChangeDate != null) {
-            try {
-                long epochDateLastChangedOn = Long.parseLong(passwordChangeDate.get().toString());
-                long today = LocalDate.now().toEpochDay();
-                expired = (epochDateLastChangedOn + retrievePasswordLifespan(passwordLifespan)) < today;
-            } catch (NamingException | NoSuchElementException e) {
-                /* If we can't get the expired password info we consider expired=false
-                 This is not actually used as part of determining a successful authentication it just suggests for a user
-                 to change their password */
-                webClientLogger.debug(e.getMessage());
-            }
-        }
-        return 1;
-    }
         
     private int retrievePasswordLifespan(Attribute passwordLifespan) throws NamingException {
         int lifespan = 42; // Standard password lifespan setting from LDAPAdmin webapp
