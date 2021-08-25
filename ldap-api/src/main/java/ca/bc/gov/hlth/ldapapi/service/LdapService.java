@@ -62,11 +62,6 @@ public class LdapService {
              
                 long hoursSinceLastAttempt = ChronoUnit.HOURS.between(loginAttemptsForUser.getLastAttempt(), LocalDateTime.now());
                 lockoutTimeInHours = attemptTimeout - hoursSinceLastAttempt;
-           
-            // Should never happen
-//           if (hoursSinceLastAttempt > attemptTimeout){
-//               lockoutTimeInHours = 0;
-//            }
             }
         }
         
