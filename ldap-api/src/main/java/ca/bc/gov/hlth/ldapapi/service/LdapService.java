@@ -60,11 +60,9 @@ public class LdapService {
             if (loginAttemptsForUser != null){
                 remainingAttempts = 3 - loginAttemptsForUser.getAttempts();
              
-                long hoursSinceLastAttempt = ChronoUnit.HOURS.between(loginAttemptsForUser.getLastAttempt(), LocalDateTime.now());
-                lockoutTimeInHours = attemptTimeout - hoursSinceLastAttempt;
+                lockoutTimeInHours = ChronoUnit.HOURS.between(loginAttemptsForUser.getLastAttempt(), LocalDateTime.now());
             }
         }
-        
         return createReturnMessage(userInfo.getName(), validCredentials, userUnlocked, userPasswordExpired, lockoutTimeInHours, remainingAttempts, userInfo.getAttributes());
     }
 
