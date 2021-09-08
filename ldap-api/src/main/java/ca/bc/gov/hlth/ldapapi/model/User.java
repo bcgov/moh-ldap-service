@@ -6,6 +6,8 @@ public class User {
     private boolean passwordExpired;
     private String username;
     private String gisuserrole;
+    private Long lockoutTimeInHours;
+    private Integer remainingAttempts;
 
     public boolean isAuthenticated() {
         return authenticated;
@@ -46,4 +48,22 @@ public class User {
     public void setPasswordExpired(boolean passwordExpired) {
         this.passwordExpired = passwordExpired;
     }
+    
+    public Integer getRemainingAttempts() {
+        return remainingAttempts;
+    }
+
+    public void setRemainingAttempts(int remainingAttempts) {
+        this.remainingAttempts = remainingAttempts;
+    }
+    
+    public Long getLockoutTimeInHours() {
+        return lockoutTimeInHours;
+    }
+
+    public void setLockoutTimeInHours(long lockoutTimeInHours) {
+        this.lockoutTimeInHours = lockoutTimeInHours;
+    }
+    
+    
 }
