@@ -44,6 +44,10 @@ public class LdapService {
 
     public User authenticate(UserCredentials userCredentials) {
         SearchResult userInfo = searchUser(userCredentials.getUserName());
+        if (userInfo == null) {
+            return null;
+        }
+
         boolean userUnlocked = checkUserLocked(userInfo.getAttributes());
         boolean userPasswordExpired = checkUserPasswordExpired(userInfo.getAttributes());
 
@@ -75,13 +79,16 @@ public class LdapService {
             constraints.setReturningObjFlag(false);
             NamingEnumeration<SearchResult> results = ctx.search(LDAP_SEARCH_BASE, "uid=" + username, constraints);
             ctx.close();
+            if (results.hasMore()) {
+                return results.next();
+            } else {
+                return null;
+            }
 
-            return results.next();
 
         } catch (NamingException e) {
-            e.printStackTrace(); // TODO separate responses based on exceptions - return 404 user not found
+            throw new RuntimeException(e);
         }
-        return null;
     }
 
     private boolean checkUserLocked(Attributes attributes) {
