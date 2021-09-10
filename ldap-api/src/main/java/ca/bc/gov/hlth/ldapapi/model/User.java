@@ -3,7 +3,6 @@ package ca.bc.gov.hlth.ldapapi.model;
 public class User {
     private boolean authenticated;
     private boolean unlocked;
-    private boolean passwordExpired;
     private String username;
     private String gisuserrole;
     private Long lockoutTimeInHours;
@@ -39,14 +38,6 @@ public class User {
 
     public void setGisuserrole(String gisuserrole) {
         this.gisuserrole = gisuserrole;
-    }
-
-    public boolean isPasswordExpired() {
-        return passwordExpired;
-    }
-
-    public void setPasswordExpired(boolean passwordExpired) {
-        this.passwordExpired = passwordExpired;
     }
     
     public Integer getRemainingAttempts() {

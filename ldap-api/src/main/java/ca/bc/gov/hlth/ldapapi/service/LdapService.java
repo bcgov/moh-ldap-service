@@ -11,10 +11,8 @@ import javax.naming.AuthenticationException;
 import javax.naming.NamingEnumeration;
 import javax.naming.NamingException;
 import javax.naming.directory.*;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
-import java.util.NoSuchElementException;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -49,25 +47,27 @@ public class LdapService {
         }
 
         boolean userUnlocked = checkUserLocked(userInfo.getAttributes());
-        boolean userPasswordExpired = checkUserPasswordExpired(userInfo.getAttributes());
 
         boolean validCredentials = false;
-        if (userUnlocked) {
-            validCredentials = authenticateUser(userInfo.getName(), userCredentials.getPassword());
-        }
-
-        // Get nbLoginAttempts and lockoutTimeOut after authenticateUser 
         long lockoutTimeInHours = 0;
         int remainingAttempts = 3;
-        if (!validCredentials){
-            LoginAttempts loginAttemptsForUser = loginAttemptsMap.get(userInfo.getName());
-            if (loginAttemptsForUser != null){
-                remainingAttempts = 3 - loginAttemptsForUser.getAttempts();
-             
-                lockoutTimeInHours = ChronoUnit.HOURS.between(loginAttemptsForUser.getLastAttempt(), LocalDateTime.now());
+
+        if (userUnlocked) {
+            AuthenticationResult authenticationResult = authenticateUser(userInfo.getName(), userCredentials.getPassword());
+            validCredentials = authenticationResult.isAuthenticated;
+            userUnlocked = !authenticationResult.isLocked;
+
+            // Get nbLoginAttempts and lockoutTimeOut after authenticateUser
+            if (!validCredentials) {
+                LoginAttempts loginAttemptsForUser = loginAttemptsMap.get(userInfo.getName());
+                if (loginAttemptsForUser != null) {
+                    remainingAttempts = 3 - loginAttemptsForUser.getAttempts();
+                    lockoutTimeInHours = ChronoUnit.HOURS.between(loginAttemptsForUser.getLastAttempt(), LocalDateTime.now());
+                }
             }
         }
-        return createReturnMessage(userInfo.getName(), validCredentials, userUnlocked, userPasswordExpired, lockoutTimeInHours, remainingAttempts, userInfo.getAttributes());
+
+        return createReturnMessage(userInfo.getName(), validCredentials, userUnlocked, lockoutTimeInHours, remainingAttempts, userInfo.getAttributes());
     }
 
     private SearchResult searchUser(String username) {
@@ -106,37 +106,10 @@ public class LdapService {
         return unlocked;
     }
 
-    private boolean checkUserPasswordExpired(Attributes attributes) {
-        Attribute passwordChangeDate = attributes.get(LDAP_ATTR_PASSWORD_CHANGE_DATE);
-        Attribute passwordLifespan = attributes.get(LDAP_ATTR_PASSLIFESPAN);
-        boolean expired = false;
-
-        if (passwordChangeDate != null) {
-            try {
-                long epochDateLastChangedOn = Long.parseLong(passwordChangeDate.get().toString());
-                long today = LocalDate.now().toEpochDay();
-                expired = (epochDateLastChangedOn + retrievePasswordLifespan(passwordLifespan)) < today;
-            } catch (NamingException | NoSuchElementException e) {
-                /* If we can't get the expired password info we consider expired=false
-                 This is not actually used as part of determining a successful authentication it just suggests for a user
-                 to change their password */
-                webClientLogger.debug(e.getMessage());
-            }
-        }
-        return expired;
-    }
-        
-    private int retrievePasswordLifespan(Attribute passwordLifespan) throws NamingException {
-        int lifespan = 42; // Standard password lifespan setting from LDAPAdmin webapp
-        if (passwordLifespan != null) {
-            lifespan = Integer.parseInt(passwordLifespan.get().toString());
-        }
-        return lifespan;
-    }
-
-    private boolean authenticateUser(String userInfoName, String password) {
+    private AuthenticationResult authenticateUser(String userInfoName, String password) {
 
         boolean userAuthenticated = false;
+        boolean accountLocked = false;
 
         Properties userLdapProperties = (Properties) ldapProperties.clone();
         userLdapProperties.put("java.naming.security.principal", userInfoName + "," + LDAP_SEARCH_BASE);
@@ -149,23 +122,23 @@ public class LdapService {
             userContext.close(); // close can also throw an exception
         } catch (NamingException e) {
             if (e instanceof AuthenticationException) {
-                updateUserFailedLoginAttempts(userInfoName);
+                accountLocked = updateUserFailedLoginAttempts(userInfoName);
                 webClientLogger.info("Failed authentication for user: " + userInfoName);
             } else {
                 e.printStackTrace(); // TODO we should return a 500 here
             }
         }
 
-        return userAuthenticated;
+        return new AuthenticationResult(userAuthenticated, accountLocked);
     }
 
-    protected void updateUserFailedLoginAttempts(String userInfoName) {
+    protected boolean updateUserFailedLoginAttempts(String userInfoName) {
         LoginAttempts loginAttemptsForUser = loginAttemptsMap.get(userInfoName);
         // No entry: add entry, set attempts=1, set timestamp=now
         if (loginAttemptsForUser == null) {
             LoginAttempts newLoginAttempts = new LoginAttempts(1, LocalDateTime.now());
             loginAttemptsMap.put(userInfoName, newLoginAttempts);
-            return;
+            return false;
         }
 
         long hoursSinceLastAttempt = ChronoUnit.HOURS.between(loginAttemptsForUser.getLastAttempt(), LocalDateTime.now());
@@ -181,13 +154,14 @@ public class LdapService {
 
         } else { // Entry Exists, timestamp<1hr, attempts >=3
             lockUserAccount(userInfoName + "," + LDAP_SEARCH_BASE);
-            loginAttemptsForUser.setAttempts(currentAttempts + 1);
-            loginAttemptsForUser.setLastAttempt(LocalDateTime.now());
+            loginAttemptsMap.remove(userInfoName);
+            return true;
         }
+        return false;
     }
 
     protected User createReturnMessage(String userName, boolean validCredentials, boolean userUnlocked,
-                                       boolean passwordExpired, long lockoutTimeInHours, int remainingAttempts,
+                                       long lockoutTimeInHours, int remainingAttempts,
                                        Attributes attributes) {
 
         User userToReturn = new User();
@@ -197,7 +171,6 @@ public class LdapService {
 
         // Role and Expiry information is only relevant if the user is authenticated and unlocked
         if (validCredentials && userUnlocked) {
-            userToReturn.setPasswordExpired(passwordExpired);
 
             Attribute gisUserRoleAttribute = attributes.get("gisuserrole");
             if (gisUserRoleAttribute != null) {
@@ -234,6 +207,16 @@ public class LdapService {
         } catch (NamingException e) {
             webClientLogger.info("Failed to lock user: " + userInfoName);
             e.printStackTrace();
+        }
+    }
+
+    private static class AuthenticationResult {
+        boolean isAuthenticated;
+        boolean isLocked;
+
+        public AuthenticationResult(boolean isAuthenticated, boolean locked) {
+            this.isAuthenticated = isAuthenticated;
+            this.isLocked = locked;
         }
     }
 
