@@ -33,7 +33,6 @@ public class LdapServiceTest {
         assertFalse(returnedUser.isAuthenticated());
         assertNull(returnedUser.getGisuserrole());
     }
-    
     @Test
     public void testCreateReturnMessage_authenticatedFalseWithRemainingAttempts() {
         User returnedUser = ldapService.createReturnMessage(userName, false, true, 1, 1, attributesWithRole);
