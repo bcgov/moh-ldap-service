@@ -28,19 +28,17 @@ public class LdapServiceTest {
 
     @Test
     public void testCreateReturnMessage_authenticatedFalse() {
-        User returnedUser = ldapService.createReturnMessage(userName, false, true, true,0,3, attributesWithRole);
+        User returnedUser = ldapService.createReturnMessage(userName, false, true, 0, 3, attributesWithRole);
         assertEquals(userName, returnedUser.getUsername());
         assertFalse(returnedUser.isAuthenticated());
-        assertFalse(returnedUser.isPasswordExpired());
         assertNull(returnedUser.getGisuserrole());
     }
-    
+
     @Test
     public void testCreateReturnMessage_authenticatedFalseWithRemainingAttempts() {
-        User returnedUser = ldapService.createReturnMessage(userName, false, true, true, 1, 1, attributesWithRole);
+        User returnedUser = ldapService.createReturnMessage(userName, false, true, 1, 1, attributesWithRole);
         assertEquals(userName, returnedUser.getUsername());
         assertFalse(returnedUser.isAuthenticated());
-        assertFalse(returnedUser.isPasswordExpired());
         assertEquals(1, returnedUser.getLockoutTimeInHours());
         assertEquals(1, returnedUser.getRemainingAttempts());
         assertNull(returnedUser.getGisuserrole());
@@ -48,11 +46,10 @@ public class LdapServiceTest {
 
     @Test
     public void testCreateReturnMessage_authenticatedTrue_userUnlockedFalse() {
-        User returnedUser = ldapService.createReturnMessage(userName, true, false, true,0,3, attributesWithRole);
+        User returnedUser = ldapService.createReturnMessage(userName, true, false, 0, 3, attributesWithRole);
         assertEquals(userName, returnedUser.getUsername());
         assertTrue(returnedUser.isAuthenticated());
         assertFalse(returnedUser.isUnlocked());
-        assertFalse(returnedUser.isPasswordExpired());
         assertNull(returnedUser.getGisuserrole());
         assertNull(returnedUser.getLockoutTimeInHours());
         assertNull(returnedUser.getRemainingAttempts());
@@ -62,21 +59,19 @@ public class LdapServiceTest {
 
     @Test
     public void testCreateReturnMessage_authenticatedTrue_RoleFalse() {
-        User returnedUser = ldapService.createReturnMessage(userName, true, true, false,0,3, attributesWithoutRole);
+        User returnedUser = ldapService.createReturnMessage(userName, true, true, 0, 3, attributesWithoutRole);
         assertEquals(userName, returnedUser.getUsername());
         assertTrue(returnedUser.isAuthenticated());
         assertTrue(returnedUser.isUnlocked());
-        assertFalse(returnedUser.isPasswordExpired());
         assertNull(returnedUser.getGisuserrole());
     }
 
     @Test
     public void testCreateReturnMessage_authenticatedTrue_RoleTrue() {
-        User returnedUser = ldapService.createReturnMessage(userName, true, true, true,0,3, attributesWithRole);
+        User returnedUser = ldapService.createReturnMessage(userName, true, true, 0, 3, attributesWithRole);
         assertEquals(userName, returnedUser.getUsername());
         assertTrue(returnedUser.isAuthenticated());
         assertTrue(returnedUser.isUnlocked());
-        assertTrue(returnedUser.isPasswordExpired());
         assertEquals("GISUSER", returnedUser.getGisuserrole());
     }
 
