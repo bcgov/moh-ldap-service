@@ -1,15 +1,15 @@
 package ca.bc.gov.hlth.ldapapi.service;
 
-import ca.bc.gov.hlth.ldapapi.model.User;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+import javax.naming.NamingException;
 import javax.naming.directory.Attributes;
 import javax.naming.directory.BasicAttributes;
 import java.time.LocalDateTime;
 import java.util.Properties;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
@@ -27,56 +27,7 @@ public class LdapServiceTest {
     }
 
     @Test
-    public void testCreateReturnMessage_authenticatedFalse() {
-        User returnedUser = ldapService.createReturnMessage(userName, false, true, 0, 3, attributesWithRole);
-        assertEquals(userName, returnedUser.getUsername());
-        assertFalse(returnedUser.isAuthenticated());
-        assertNull(returnedUser.getGisuserrole());
-    }
-
-    @Test
-    public void testCreateReturnMessage_authenticatedFalseWithRemainingAttempts() {
-        User returnedUser = ldapService.createReturnMessage(userName, false, true, 1, 1, attributesWithRole);
-        assertEquals(userName, returnedUser.getUsername());
-        assertFalse(returnedUser.isAuthenticated());
-        assertEquals(1, returnedUser.getLockoutTimeInHours());
-        assertEquals(1, returnedUser.getRemainingAttempts());
-        assertNull(returnedUser.getGisuserrole());
-    }
-
-    @Test
-    public void testCreateReturnMessage_authenticatedTrue_userUnlockedFalse() {
-        User returnedUser = ldapService.createReturnMessage(userName, true, false, 0, 3, attributesWithRole);
-        assertEquals(userName, returnedUser.getUsername());
-        assertTrue(returnedUser.isAuthenticated());
-        assertFalse(returnedUser.isUnlocked());
-        assertNull(returnedUser.getGisuserrole());
-        assertNull(returnedUser.getLockoutTimeInHours());
-        assertNull(returnedUser.getRemainingAttempts());
-//        assertEquals(0, returnedUser.getLockoutTimeInHours());
-//        assertEquals(0, returnedUser.getRemainingAttempts());
-    }
-
-    @Test
-    public void testCreateReturnMessage_authenticatedTrue_RoleFalse() {
-        User returnedUser = ldapService.createReturnMessage(userName, true, true, 0, 3, attributesWithoutRole);
-        assertEquals(userName, returnedUser.getUsername());
-        assertTrue(returnedUser.isAuthenticated());
-        assertTrue(returnedUser.isUnlocked());
-        assertNull(returnedUser.getGisuserrole());
-    }
-
-    @Test
-    public void testCreateReturnMessage_authenticatedTrue_RoleTrue() {
-        User returnedUser = ldapService.createReturnMessage(userName, true, true, 0, 3, attributesWithRole);
-        assertEquals(userName, returnedUser.getUsername());
-        assertTrue(returnedUser.isAuthenticated());
-        assertTrue(returnedUser.isUnlocked());
-        assertEquals("GISUSER", returnedUser.getGisuserrole());
-    }
-
-    @Test
-    public void testUpdateUserFailedLoginAttempts_noEntryHour() {
+    public void testUpdateUserFailedLoginAttempts_noEntryHour() throws NamingException {
         ldapService.loginAttemptsMap.clear();
         ldapService.updateUserFailedLoginAttempts("bob");
 
@@ -84,7 +35,7 @@ public class LdapServiceTest {
     }
 
     @Test
-    public void testUpdateUserFailedLoginAttempts_timeOverOneHour() {
+    public void testUpdateUserFailedLoginAttempts_timeOverOneHour() throws NamingException {
         ldapService.loginAttemptsMap.clear();
         ldapService.loginAttemptsMap.put("bob", new LoginAttempts(1, LocalDateTime.now().minusHours(3)));
         ldapService.updateUserFailedLoginAttempts("bob");
@@ -93,7 +44,7 @@ public class LdapServiceTest {
     }
 
     @Test
-    public void testUpdateUserFailedLoginAttempts_lessThanTwoFailed() {
+    public void testUpdateUserFailedLoginAttempts_lessThanTwoFailed() throws NamingException {
         ldapService.loginAttemptsMap.clear();
         ldapService.loginAttemptsMap.put("bob", new LoginAttempts(1, LocalDateTime.now()));
         ldapService.updateUserFailedLoginAttempts("bob");
@@ -102,7 +53,7 @@ public class LdapServiceTest {
     }
 
     @Test
-    public void testUpdateUserFailedLoginAttempts_lastAttempt() {
+    public void testUpdateUserFailedLoginAttempts_lastAttempt() throws NamingException {
         LdapService localLdapService = spy(new LdapService(new Properties()));
         doNothing().when(localLdapService).lockUserAccount(anyString());
 

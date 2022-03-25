@@ -1,6 +1,5 @@
 package ca.bc.gov.hlth.ldapapi.service;
 
-import ca.bc.gov.hlth.ldapapi.model.User;
 import ca.bc.gov.hlth.ldapapi.model.UserCredentials;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,6 +12,8 @@ import javax.naming.NamingException;
 import javax.naming.directory.*;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -27,20 +28,21 @@ public class LdapService {
     private static final String LDAP_CONST_ACCOUNT_LOCKED_ATTRIBUTE = "acctlockedflag";
     private static final String LDAP_ATTR_ACCT_LOCKED_BY = "acctlockedby";
     private static final String LDAP_ATTR_ACCT_LOCKED_REASON = "acctlockedreason";
-    private static final String LDAP_ATTR_PASSWORD_CHANGE_DATE = "passwordchangedate";
-    private static final String LDAP_ATTR_PASSLIFESPAN = "passlifespan";
     private static final String LDAP_SEARCH_BASE = "o=hnet,st=bc,c=ca";
 
     @Value("${ldap.attempt.timeout}")
-    protected int attemptTimeout;
+    int attemptTimeout;
 
-    protected final ConcurrentHashMap<String, LoginAttempts> loginAttemptsMap = new ConcurrentHashMap<>();
+    @Value("${roleAttributeNames}")
+    private String roles;
+
+    final ConcurrentHashMap<String, LoginAttempts> loginAttemptsMap = new ConcurrentHashMap<>();
 
     public LdapService(Properties ldapProperties) {
         this.ldapProperties = ldapProperties;
     }
 
-    public User authenticate(UserCredentials userCredentials) {
+    public Object authenticate(UserCredentials userCredentials) throws NamingException {
         SearchResult userInfo = searchUser(userCredentials.getUserName());
         if (userInfo == null) {
             return null;
@@ -70,43 +72,33 @@ public class LdapService {
         return createReturnMessage(userInfo.getName(), validCredentials, userUnlocked, lockoutTimeInHours, remainingAttempts, userInfo.getAttributes());
     }
 
-    private SearchResult searchUser(String username) {
-        try {
-            DirContext ctx = new InitialDirContext(ldapProperties);
-            SearchControls constraints = new SearchControls();
-            constraints.setSearchScope(2);
-            constraints.setCountLimit(300L); // TODO filter out names that could cause a wildcard search
-            constraints.setReturningObjFlag(false);
-            NamingEnumeration<SearchResult> results = ctx.search(LDAP_SEARCH_BASE, "uid=" + username, constraints);
-            ctx.close();
-            if (results.hasMore()) {
-                return results.next();
-            } else {
-                return null;
-            }
-
-
-        } catch (NamingException e) {
-            throw new RuntimeException(e);
+    private SearchResult searchUser(String username) throws NamingException {
+        DirContext ctx = new InitialDirContext(ldapProperties);
+        SearchControls constraints = new SearchControls();
+        constraints.setSearchScope(2);
+        constraints.setCountLimit(300L); // TODO filter out names that could cause a wildcard search
+        constraints.setReturningObjFlag(false);
+        NamingEnumeration<SearchResult> results = ctx.search(LDAP_SEARCH_BASE, "uid=" + username, constraints);
+        ctx.close();
+        if (results.hasMore()) {
+            return results.next();
+        } else {
+            return null;
         }
     }
 
-    private boolean checkUserLocked(Attributes attributes) {
+    private boolean checkUserLocked(Attributes attributes) throws NamingException {
         Attribute acctLockedFlag = attributes.get(LDAP_CONST_ACCOUNT_LOCKED_ATTRIBUTE);
         boolean unlocked = true;
 
         if (acctLockedFlag != null) {
-            try {
-                // If the attribute exists the account is locked in any case except for a value of "unlocked"
-                unlocked = LDAP_CONST_UNLOCKED.equalsIgnoreCase(acctLockedFlag.get().toString());
-            } catch (NamingException e) { // TODO Naming exception should return a 500, NoSuchElementException can be caught
-                e.printStackTrace();
-            }
+            // If the attribute exists the account is locked in any case except for a value of "unlocked"
+            unlocked = LDAP_CONST_UNLOCKED.equalsIgnoreCase(acctLockedFlag.get().toString());
         }
         return unlocked;
     }
 
-    private AuthenticationResult authenticateUser(String userInfoName, String password) {
+    private AuthenticationResult authenticateUser(String userInfoName, String password) throws NamingException {
 
         boolean userAuthenticated = false;
         boolean accountLocked = false;
@@ -125,14 +117,14 @@ public class LdapService {
                 accountLocked = updateUserFailedLoginAttempts(userInfoName);
                 webClientLogger.info("Failed authentication for user: " + userInfoName);
             } else {
-                e.printStackTrace(); // TODO we should return a 500 here
+                throw new RuntimeException(e);
             }
         }
 
         return new AuthenticationResult(userAuthenticated, accountLocked);
     }
 
-    protected boolean updateUserFailedLoginAttempts(String userInfoName) {
+    boolean updateUserFailedLoginAttempts(String userInfoName) throws NamingException {
         LoginAttempts loginAttemptsForUser = loginAttemptsMap.get(userInfoName);
         // No entry: add entry, set attempts=1, set timestamp=now
         if (loginAttemptsForUser == null) {
@@ -160,54 +152,44 @@ public class LdapService {
         return false;
     }
 
-    protected User createReturnMessage(String userName, boolean validCredentials, boolean userUnlocked,
-                                       long lockoutTimeInHours, int remainingAttempts,
-                                       Attributes attributes) {
+    private Map<String, Object> createReturnMessage(String userName, boolean validCredentials, boolean userUnlocked,
+                                            long lockoutTimeInHours, int remainingAttempts,
+                                            Attributes attributes) throws NamingException {
 
-        User userToReturn = new User();
-        userToReturn.setUsername(userName);
-        userToReturn.setAuthenticated(validCredentials);
-        userToReturn.setUnlocked(userUnlocked);
+        Map<String, Object> userMap = new HashMap<>();
+        userMap.put("username", userName);
+        userMap.put("authenticated", validCredentials);
+        userMap.put("unlocked", userUnlocked);
 
-        // Role and Expiry information is only relevant if the user is authenticated and unlocked
         if (validCredentials && userUnlocked) {
-
-            Attribute gisUserRoleAttribute = attributes.get("gisuserrole");
-            if (gisUserRoleAttribute != null) {
-                try {
-                    userToReturn.setGisuserrole((String) gisUserRoleAttribute.get());
-                } catch (NamingException e) {
-                    e.printStackTrace(); // TODO we should return a 500 here
+            for (String role : roles.split(",")) {
+                Attribute userRoleAttribute = attributes.get(role);
+                if (userRoleAttribute != null) {
+                    userMap.put(role, userRoleAttribute.get());
                 }
             }
         } else if (!validCredentials) {
-            userToReturn.setLockoutTimeInHours(lockoutTimeInHours);
-            userToReturn.setRemainingAttempts(remainingAttempts);
+            userMap.put("lockoutTimeInHours", lockoutTimeInHours);
+            userMap.put("remainingAttempts", remainingAttempts);
         }
 
-        return userToReturn;
+        return userMap;
     }
-        
-    protected void lockUserAccount(String userInfoName) {
-        try {
-            DirContext ctx = new InitialDirContext(ldapProperties);
 
-            ModificationItem lockedItem = new ModificationItem(DirContext.REPLACE_ATTRIBUTE,
-                    new BasicAttribute(LDAP_CONST_ACCOUNT_LOCKED_ATTRIBUTE, LDAP_CONST_LOCKED));
-            ModificationItem lockedReasonItem = new ModificationItem(DirContext.REPLACE_ATTRIBUTE,
-                    new BasicAttribute(LDAP_ATTR_ACCT_LOCKED_REASON, "User exceeded maximum login attempts"));
-            ModificationItem lockedByItem = new ModificationItem(DirContext.REPLACE_ATTRIBUTE,
-                    new BasicAttribute(LDAP_ATTR_ACCT_LOCKED_BY, "KeycloakEnrollment"));
+    void lockUserAccount(String userInfoName) throws NamingException {
+        DirContext ctx = new InitialDirContext(ldapProperties);
 
-            ModificationItem[] changeItems = {lockedItem, lockedReasonItem, lockedByItem};
+        ModificationItem lockedItem = new ModificationItem(DirContext.REPLACE_ATTRIBUTE,
+                new BasicAttribute(LDAP_CONST_ACCOUNT_LOCKED_ATTRIBUTE, LDAP_CONST_LOCKED));
+        ModificationItem lockedReasonItem = new ModificationItem(DirContext.REPLACE_ATTRIBUTE,
+                new BasicAttribute(LDAP_ATTR_ACCT_LOCKED_REASON, "User exceeded maximum login attempts"));
+        ModificationItem lockedByItem = new ModificationItem(DirContext.REPLACE_ATTRIBUTE,
+                new BasicAttribute(LDAP_ATTR_ACCT_LOCKED_BY, "KeycloakEnrollment"));
 
-            ctx.modifyAttributes(userInfoName, changeItems);
-            webClientLogger.info("User locked: " + userInfoName);
+        ModificationItem[] changeItems = {lockedItem, lockedReasonItem, lockedByItem};
 
-        } catch (NamingException e) {
-            webClientLogger.info("Failed to lock user: " + userInfoName);
-            e.printStackTrace();
-        }
+        ctx.modifyAttributes(userInfoName, changeItems);
+        webClientLogger.info("User locked: " + userInfoName);
     }
 
     private static class AuthenticationResult {
