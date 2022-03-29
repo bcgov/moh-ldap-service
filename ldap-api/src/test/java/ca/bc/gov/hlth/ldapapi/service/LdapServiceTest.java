@@ -4,8 +4,6 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import javax.naming.NamingException;
-import javax.naming.directory.Attributes;
-import javax.naming.directory.BasicAttributes;
 import java.time.LocalDateTime;
 import java.util.Properties;
 
@@ -14,10 +12,6 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 public class LdapServiceTest {
-
-    private final String userName = "TestUserID";
-    private final Attributes attributesWithRole = new BasicAttributes("gisuserrole", "GISUSER");
-    private final Attributes attributesWithoutRole = new BasicAttributes();
 
     private static final LdapService ldapService = new LdapService(new Properties());
 
