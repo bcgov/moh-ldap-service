@@ -157,7 +157,7 @@ public class LdapService {
                                             Attributes attributes) throws NamingException {
 
         Map<String, Object> userMap = new HashMap<>();
-        userMap.put("username", userName);
+        userMap.put("userName", userName);
         userMap.put("authenticated", validCredentials);
         userMap.put("unlocked", userUnlocked);
 
