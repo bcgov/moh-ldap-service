@@ -162,6 +162,7 @@ public class LdapService {
         userMap.put("unlocked", userUnlocked);
 
         if (validCredentials && userUnlocked) {
+            userMap.put("org_details", "{\"id\":\"00002855\",\"name\":\"PRS BCMOH - Registry Administrator\"}");
             for (String role : roles.split(",")) {
                 Attribute userRoleAttribute = attributes.get(role);
                 if (userRoleAttribute != null) {
