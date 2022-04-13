@@ -19,6 +19,8 @@ public class UserService {
 
     private final LdapService ldapService;
 
+    private OrgLookup orgLookup;
+
     @Value("${ldap.attempt.timeout}")
     int attemptTimeout;
 
@@ -27,8 +29,9 @@ public class UserService {
 
     final ConcurrentHashMap<String, LoginAttempts> loginAttemptsMap = new ConcurrentHashMap<>();
 
-    public UserService(LdapService ldapService) {
+    public UserService(LdapService ldapService, OrgLookup orgLookup) {
         this.ldapService = ldapService;
+        this.orgLookup = orgLookup;
     }
 
     public Object authenticate(UserCredentials userCredentials) throws NamingException {
@@ -101,10 +104,7 @@ public class UserService {
         userMap.put("unlocked", userUnlocked);
 
         if (validCredentials && userUnlocked) {
-            Map<String, String> org = new HashMap<>();
-            org.put("id", "00002855");
-            org.put("name", "PRS BCMOH - Registry Administrator");
-            userMap.put("org_details", org);
+            userMap.put("org_details", orgLookup.determineOrgJsonFromLdapUserName(userName));
             for (String role : roles.split(",")) {
                 Attribute userRoleAttribute = attributes.get(role);
                 if (userRoleAttribute != null) {

@@ -3,8 +3,9 @@ package ca.bc.gov.hlth.ldapapi.service;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
+import java.util.Map;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 class OrgLookupTest {
 
@@ -16,20 +17,26 @@ class OrgLookupTest {
     }
 
     @Test
-    public void lookup1() {
-        String orgName = orgLookup.lookup("00000010").get();
-        assertEquals("Ministry of Health", orgName);
+    public void determineOrg_moh() {
+        Map<String, String> map = orgLookup.determineOrgJsonFromLdapUserName("uid=3-primehcimintegrationtest,o=Ministry of Health");
+        assertAll(
+                () -> assertEquals("00000010", map.get("id"), "id"),
+                () -> assertEquals("Ministry of Health", map.get("name"), "name")
+        );
     }
 
     @Test
-    public void lookup2() {
-        String orgName = orgLookup.lookup("00002855").get();
-        assertEquals("PRS BCMOH - Registry Administrator", orgName);
+    public void determineOrg_standardEightDigit() {
+        Map<String, String> map = orgLookup.determineOrgJsonFromLdapUserName("uid=1-primehcimintegrationtest,o=00002855");
+        assertAll(
+                () -> assertEquals("00002855", map.get("id"), "id"),
+                () -> assertEquals("PRS BCMOH - Registry Administrator", map.get("name"), "name")
+        );
     }
 
     @Test
-    public void lookup_doesNotExit_throwsNoSuchElementException() {
-        assertFalse(orgLookup.lookup("does_not_exist").isPresent());
+    public void determineOrg_orgDoesNotExist() {
+        assertThrows(IllegalStateException.class, () -> orgLookup.determineOrgJsonFromLdapUserName("uid=1-primehcimintegrationtest,o=DoesNotExist"));
     }
 
 }

@@ -46,7 +46,7 @@ class UsersControllerTest {
     private static boolean runOnce = true;
 
     @BeforeEach
-    public void init() throws NamingException, InterruptedException {
+    public void init() throws NamingException {
 //         urlUnderTest = "https://common-logon-dev.hlth.gov.bc.ca/ldap/users";
         urlUnderTest = "http://localhost:" + port + "/users";
         if (runOnce) {
@@ -154,7 +154,7 @@ class UsersControllerTest {
     @Test
     public void postUser_mohOrganization_orgTranslated() {
         Map<String, String> data = new HashMap<>();
-        data.put("userName", USERNAME);
+        data.put("userName", USERNAME3);
         data.put("password", PASSWORD);
         ResponseEntity<Map> response = restTemplate.postForEntity(urlUnderTest, data, Map.class);
         Map<String, Object> expectedOrganization = new HashMap<>();
