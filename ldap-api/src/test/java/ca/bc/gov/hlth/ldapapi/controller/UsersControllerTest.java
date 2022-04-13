@@ -46,7 +46,8 @@ class UsersControllerTest {
     private static boolean runOnce = true;
 
     @BeforeEach
-    public void init() throws NamingException {
+    public void init() throws NamingException, InterruptedException {
+//         urlUnderTest = "https://common-logon-dev.hlth.gov.bc.ca/ldap/users";
         urlUnderTest = "http://localhost:" + port + "/users";
         if (runOnce) {
             SearchResult searchResult = searchUser(USERNAME);
@@ -61,7 +62,9 @@ class UsersControllerTest {
         data.put("userName", USERNAME);
         data.put("password", PASSWORD);
         ResponseEntity<Map> response = restTemplate.postForEntity(urlUnderTest, data, Map.class);
-        String expectedOrganization = "{\"id\":\"00002855\",\"name\":\"PRS BCMOH - Registry Administrator\"}";
+        Map<String, Object> expectedOrganization = new HashMap<>();
+        expectedOrganization.put("id", "00002855");
+        expectedOrganization.put("name", "PRS BCMOH - Registry Administrator");
         assertAll(
                 () -> assertTrue((Boolean) response.getBody().get("authenticated"), "authenticated"),
                 () -> assertTrue((Boolean) response.getBody().get("unlocked"), "unlocked"),
@@ -79,13 +82,13 @@ class UsersControllerTest {
         data.put("password", "not_a_real_password");
         ResponseEntity<Map> response = restTemplate.postForEntity(urlUnderTest, data, Map.class);
         assertAll(
-                () -> assertFalse((Boolean) response.getBody().get("authenticated")),
-                () -> assertTrue((Boolean) response.getBody().get("unlocked")),
-                () -> assertTrue(response.getBody().containsKey("userName")),
-                () -> assertFalse(response.getBody().containsKey("hcmuserrole")),
-                () -> assertFalse(response.getBody().containsKey("org_details")),
+                () -> assertFalse((Boolean) response.getBody().get("authenticated"), "authenticated"),
+                () -> assertTrue((Boolean) response.getBody().get("unlocked"), "unlocked"),
+                () -> assertTrue(response.getBody().containsKey("userName"), "userName"),
+                () -> assertFalse(response.getBody().containsKey("hcmuserrole"), "hcmuserrole"),
+                () -> assertFalse(response.getBody().containsKey("org_details"), "org_details"),
                 // Other tests may be using 1-primehcimintegrationtest, so we don't know the exact count,
-                () -> assertTrue(((Integer) response.getBody().get("remainingAttempts")) < 3)
+                () -> assertTrue(((Integer) response.getBody().get("remainingAttempts")) < 3, "remainingAttempts")
         );
     }
 
@@ -154,7 +157,9 @@ class UsersControllerTest {
         data.put("userName", USERNAME);
         data.put("password", PASSWORD);
         ResponseEntity<Map> response = restTemplate.postForEntity(urlUnderTest, data, Map.class);
-        String expectedOrganization = "{\"id\":\"00000010\",\"name\":\"Ministry of Health\"}";
+        Map<String, Object> expectedOrganization = new HashMap<>();
+        expectedOrganization.put("id", "00000010");
+        expectedOrganization.put("name", "Ministry of Health");
         assertAll(
                 () -> assertTrue((Boolean) response.getBody().get("authenticated"), "authenticated"),
                 () -> assertTrue((Boolean) response.getBody().get("unlocked"), "unlocked"),
