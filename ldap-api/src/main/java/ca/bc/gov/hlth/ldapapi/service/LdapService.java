@@ -55,9 +55,11 @@ public class LdapService {
         int remainingAttempts = 3;
 
         if (userUnlocked) {
-            AuthenticationResult authenticationResult = authenticateUser(userInfo.getName(), userCredentials.getPassword());
-            validCredentials = authenticationResult.isAuthenticated;
-            userUnlocked = !authenticationResult.isLocked;
+            validCredentials = authenticateUser(userInfo.getName(), userCredentials.getPassword());
+
+            if (!validCredentials) {
+                userUnlocked = !updateUserFailedLoginAttempts(userInfo.getName());
+            }
 
             // Get nbLoginAttempts and lockoutTimeOut after authenticateUser
             if (!validCredentials) {
@@ -98,10 +100,7 @@ public class LdapService {
         return unlocked;
     }
 
-    private AuthenticationResult authenticateUser(String userInfoName, String password) throws NamingException {
-
-        boolean userAuthenticated = false;
-        boolean accountLocked = false;
+    private boolean authenticateUser(String userInfoName, String password) throws NamingException {
 
         Properties userLdapProperties = (Properties) ldapProperties.clone();
         userLdapProperties.put("java.naming.security.principal", userInfoName + "," + LDAP_SEARCH_BASE);
@@ -110,18 +109,17 @@ public class LdapService {
 
         try {
             DirContext userContext = new InitialDirContext(userLdapProperties);
-            userAuthenticated = true;
             userContext.close(); // close can also throw an exception
         } catch (NamingException e) {
             if (e instanceof AuthenticationException) {
-                accountLocked = updateUserFailedLoginAttempts(userInfoName);
                 webClientLogger.info("Failed authentication for user: " + userInfoName);
+                return false;
             } else {
                 throw new RuntimeException(e);
             }
         }
 
-        return new AuthenticationResult(userAuthenticated, accountLocked);
+        return true;
     }
 
     boolean updateUserFailedLoginAttempts(String userInfoName) throws NamingException {
