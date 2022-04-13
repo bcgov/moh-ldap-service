@@ -11,7 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
-public class LdapServiceTest {
+public class UserServiceTest {
 
     private static final UserService USER_SERVICE = new UserService(new Properties());
 
