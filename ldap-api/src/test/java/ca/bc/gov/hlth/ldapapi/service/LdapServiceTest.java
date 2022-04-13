@@ -13,48 +13,48 @@ import static org.mockito.Mockito.*;
 
 public class LdapServiceTest {
 
-    private static final LdapService ldapService = new LdapService(new Properties());
+    private static final UserService USER_SERVICE = new UserService(new Properties());
 
     @BeforeAll
     public static void initialSetup() {
-        ldapService.attemptTimeout = 1;
+        USER_SERVICE.attemptTimeout = 1;
     }
 
     @Test
     public void testUpdateUserFailedLoginAttempts_noEntryHour() throws NamingException {
-        ldapService.loginAttemptsMap.clear();
-        ldapService.updateUserFailedLoginAttempts("bob");
+        USER_SERVICE.loginAttemptsMap.clear();
+        USER_SERVICE.updateUserFailedLoginAttempts("bob");
 
-        assertEquals(1, ldapService.loginAttemptsMap.get("bob").getAttempts());
+        assertEquals(1, USER_SERVICE.loginAttemptsMap.get("bob").getAttempts());
     }
 
     @Test
     public void testUpdateUserFailedLoginAttempts_timeOverOneHour() throws NamingException {
-        ldapService.loginAttemptsMap.clear();
-        ldapService.loginAttemptsMap.put("bob", new LoginAttempts(1, LocalDateTime.now().minusHours(3)));
-        ldapService.updateUserFailedLoginAttempts("bob");
+        USER_SERVICE.loginAttemptsMap.clear();
+        USER_SERVICE.loginAttemptsMap.put("bob", new LoginAttempts(1, LocalDateTime.now().minusHours(3)));
+        USER_SERVICE.updateUserFailedLoginAttempts("bob");
 
-        assertEquals(1, ldapService.loginAttemptsMap.get("bob").getAttempts());
+        assertEquals(1, USER_SERVICE.loginAttemptsMap.get("bob").getAttempts());
     }
 
     @Test
     public void testUpdateUserFailedLoginAttempts_lessThanTwoFailed() throws NamingException {
-        ldapService.loginAttemptsMap.clear();
-        ldapService.loginAttemptsMap.put("bob", new LoginAttempts(1, LocalDateTime.now()));
-        ldapService.updateUserFailedLoginAttempts("bob");
+        USER_SERVICE.loginAttemptsMap.clear();
+        USER_SERVICE.loginAttemptsMap.put("bob", new LoginAttempts(1, LocalDateTime.now()));
+        USER_SERVICE.updateUserFailedLoginAttempts("bob");
 
-        assertEquals(2, ldapService.loginAttemptsMap.get("bob").getAttempts());
+        assertEquals(2, USER_SERVICE.loginAttemptsMap.get("bob").getAttempts());
     }
 
     @Test
     public void testUpdateUserFailedLoginAttempts_lastAttempt() throws NamingException {
-        LdapService localLdapService = spy(new LdapService(new Properties()));
-        doNothing().when(localLdapService).lockUserAccount(anyString());
+        UserService localUserService = spy(new UserService(new Properties()));
+        doNothing().when(localUserService).lockUserAccount(anyString());
 
-        localLdapService.loginAttemptsMap.clear();
-        localLdapService.loginAttemptsMap.put("bob", new LoginAttempts(2, LocalDateTime.now()));
-        localLdapService.updateUserFailedLoginAttempts("bob");
+        localUserService.loginAttemptsMap.clear();
+        localUserService.loginAttemptsMap.put("bob", new LoginAttempts(2, LocalDateTime.now()));
+        localUserService.updateUserFailedLoginAttempts("bob");
 
-        verify(localLdapService, times(1)).lockUserAccount(anyString());
+        verify(localUserService, times(1)).lockUserAccount(anyString());
     }
 }

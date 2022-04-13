@@ -1,7 +1,7 @@
 package ca.bc.gov.hlth.ldapapi.controller;
 
 import ca.bc.gov.hlth.ldapapi.model.UserCredentials;
-import ca.bc.gov.hlth.ldapapi.service.LdapService;
+import ca.bc.gov.hlth.ldapapi.service.UserService;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -14,15 +14,15 @@ import javax.naming.NamingException;
 @RestController
 public class UsersController {
 
-    final LdapService ldapService;
+    final UserService userService;
 
-    public UsersController(LdapService ldapService) {
-        this.ldapService = ldapService;
+    public UsersController(UserService userService) {
+        this.userService = userService;
     }
 
     @PostMapping("/users")
     public ResponseEntity<Object> getUser(@RequestBody UserCredentials userCredentials) throws NamingException {
-        Object user = ldapService.authenticate(userCredentials);
+        Object user = userService.authenticate(userCredentials);
         if (user != null) {
             return new ResponseEntity<>(user, HttpStatus.OK);
         } else {

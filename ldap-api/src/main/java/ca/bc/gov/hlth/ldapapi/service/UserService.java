@@ -18,9 +18,9 @@ import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
-public class LdapService {
+public class UserService {
 
-    private final Logger webClientLogger = LoggerFactory.getLogger(LdapService.class);
+    private final Logger webClientLogger = LoggerFactory.getLogger(UserService.class);
     private final Properties ldapProperties;
 
     private static final String LDAP_CONST_UNLOCKED = "unlocked";
@@ -38,7 +38,7 @@ public class LdapService {
 
     final ConcurrentHashMap<String, LoginAttempts> loginAttemptsMap = new ConcurrentHashMap<>();
 
-    public LdapService(Properties ldapProperties) {
+    public UserService(Properties ldapProperties) {
         this.ldapProperties = ldapProperties;
     }
 
