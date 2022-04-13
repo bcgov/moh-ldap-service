@@ -92,8 +92,8 @@ public class UserService {
     }
 
     private Map<String, Object> createReturnMessage(String userName, boolean validCredentials, boolean userUnlocked,
-                                            long lockoutTimeInHours, int remainingAttempts,
-                                            Attributes attributes) throws NamingException {
+                                                    long lockoutTimeInHours, int remainingAttempts,
+                                                    Attributes attributes) throws NamingException {
 
         Map<String, Object> userMap = new HashMap<>();
         userMap.put("userName", userName);
@@ -117,6 +117,32 @@ public class UserService {
         }
 
         return userMap;
+    }
+
+    private static class LoginAttempts {
+        private int attempts;
+        private LocalDateTime lastAttempt;
+
+        LoginAttempts(int attempts, LocalDateTime lastAttempt) {
+            this.attempts = attempts;
+            this.lastAttempt = lastAttempt;
+        }
+
+        int getAttempts() {
+            return attempts;
+        }
+
+        void setAttempts(int attempts) {
+            this.attempts = attempts;
+        }
+
+        LocalDateTime getLastAttempt() {
+            return lastAttempt;
+        }
+
+        void setLastAttempt(LocalDateTime lastAttempt) {
+            this.lastAttempt = lastAttempt;
+        }
     }
 
 }
