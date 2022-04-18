@@ -36,12 +36,18 @@ class UsersControllerTest {
     @Value("${LDAP_API_INTEGRATION_TEST_PASSWORD}")
     String PASSWORD;
 
+    // Unlocked, has role
     public static final String USERNAME = "1-primehcimintegrationtest";
+    // Locked, no role
+    private static final String USERNAME2 = "2-primehcimintegrationtest";
+    // Unlocked, has role, is "Ministry of Health" organization (requires translation to "00000010").
+    private static final String USERNAME3 = "3-primehcimintegrationtest";
 
     private static boolean runOnce = true;
 
     @BeforeEach
-    public void init() throws InterruptedException, NamingException {
+    public void init() throws NamingException {
+//         urlUnderTest = "https://common-logon-dev.hlth.gov.bc.ca/ldap/users";
         urlUnderTest = "http://localhost:" + port + "/users";
         if (runOnce) {
             SearchResult searchResult = searchUser(USERNAME);
@@ -56,11 +62,16 @@ class UsersControllerTest {
         data.put("userName", USERNAME);
         data.put("password", PASSWORD);
         ResponseEntity<Map> response = restTemplate.postForEntity(urlUnderTest, data, Map.class);
+        Map<String, Object> expectedOrganization = new HashMap<>();
+        expectedOrganization.put("id", "00002855");
+        expectedOrganization.put("name", "PRS BCMOH - Registry Administrator");
         assertAll(
-                () -> assertTrue((Boolean) response.getBody().get("authenticated")),
-                () -> assertTrue((Boolean) response.getBody().get("unlocked")),
-                () -> assertTrue(response.getBody().containsKey("userName")),
-                () -> assertTrue(response.getBody().containsKey("hcmuserrole"))
+                () -> assertTrue((Boolean) response.getBody().get("authenticated"), "authenticated"),
+                () -> assertTrue((Boolean) response.getBody().get("unlocked"), "unlocked"),
+                () -> assertTrue(response.getBody().containsKey("userName"), "userName"),
+                () -> assertTrue(response.getBody().containsKey("hcmuserrole"), "hcmuserrole"),
+                () -> assertTrue(response.getBody().containsKey("org_details"), "org_details"),
+                () -> assertEquals(expectedOrganization, response.getBody().get("org_details"))
         );
     }
 
@@ -71,12 +82,13 @@ class UsersControllerTest {
         data.put("password", "not_a_real_password");
         ResponseEntity<Map> response = restTemplate.postForEntity(urlUnderTest, data, Map.class);
         assertAll(
-                () -> assertFalse((Boolean) response.getBody().get("authenticated")),
-                () -> assertTrue((Boolean) response.getBody().get("unlocked")),
-                () -> assertTrue(response.getBody().containsKey("userName")),
-                () -> assertFalse(response.getBody().containsKey("hcmuserrole")),
+                () -> assertFalse((Boolean) response.getBody().get("authenticated"), "authenticated"),
+                () -> assertTrue((Boolean) response.getBody().get("unlocked"), "unlocked"),
+                () -> assertTrue(response.getBody().containsKey("userName"), "userName"),
+                () -> assertFalse(response.getBody().containsKey("hcmuserrole"), "hcmuserrole"),
+                () -> assertFalse(response.getBody().containsKey("org_details"), "org_details"),
                 // Other tests may be using 1-primehcimintegrationtest, so we don't know the exact count,
-                () -> assertTrue(((Integer) response.getBody().get("remainingAttempts")) < 3)
+                () -> assertTrue(((Integer) response.getBody().get("remainingAttempts")) < 3, "remainingAttempts")
         );
     }
 
@@ -92,7 +104,7 @@ class UsersControllerTest {
     @Test
     public void postUser_lockedUser_isLocked() {
         Map<String, String> data = new HashMap<>();
-        data.put("userName", "2-primehcimintegrationtest");
+        data.put("userName", USERNAME2);
         // This is a valid password, but "authenticated" will still be false.
         data.put("password", PASSWORD);
         ResponseEntity<Map> response = restTemplate.postForEntity(urlUnderTest, data, Map.class);
@@ -101,6 +113,7 @@ class UsersControllerTest {
                 () -> assertFalse((Boolean) response.getBody().get("unlocked")),
                 () -> assertTrue(response.getBody().containsKey("userName")),
                 () -> assertFalse(response.getBody().containsKey("hcmuserrole")),
+                () -> assertFalse(response.getBody().containsKey("org_details")),
                 () -> assertEquals(3, response.getBody().get("remainingAttempts"))
         );
     }
@@ -137,6 +150,26 @@ class UsersControllerTest {
             unlockUserAccount(searchResult.getName() + "," + LDAP_SEARCH_BASE);
         }
     }
+
+    @Test
+    public void postUser_mohOrganization_orgTranslated() {
+        Map<String, String> data = new HashMap<>();
+        data.put("userName", USERNAME3);
+        data.put("password", PASSWORD);
+        ResponseEntity<Map> response = restTemplate.postForEntity(urlUnderTest, data, Map.class);
+        Map<String, Object> expectedOrganization = new HashMap<>();
+        expectedOrganization.put("id", "00000010");
+        expectedOrganization.put("name", "Ministry of Health");
+        assertAll(
+                () -> assertTrue((Boolean) response.getBody().get("authenticated"), "authenticated"),
+                () -> assertTrue((Boolean) response.getBody().get("unlocked"), "unlocked"),
+                () -> assertTrue(response.getBody().containsKey("userName"), "userName"),
+                () -> assertTrue(response.getBody().containsKey("hcmuserrole"), "hcmuserrole"),
+                () -> assertTrue(response.getBody().containsKey("org_details"), "org_details"),
+                () -> assertEquals(expectedOrganization, response.getBody().get("org_details"))
+        );
+    }
+
 
     private static final String LDAP_CONST_UNLOCKED = "unlocked";
     private static final String LDAP_CONST_LOCKED = "locked";

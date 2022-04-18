@@ -1,4 +1,4 @@
-package ca.bc.gov.hlth.ldapapi.service;
+package ca.bc.gov.hlth.ldapapi;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
