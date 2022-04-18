@@ -37,7 +37,7 @@ class UsersControllerTest {
     String PASSWORD;
 
     // Unlocked, has role
-    public static final String USERNAME = "1-primehcimintegrationtest";
+    private static final String USERNAME = "1-primehcimintegrationtest";
     // Locked, no role
     private static final String USERNAME2 = "2-primehcimintegrationtest";
     // Unlocked, has role, is "Ministry of Health" organization (requires translation to "00000010").
@@ -47,8 +47,8 @@ class UsersControllerTest {
 
     @BeforeEach
     public void init() throws NamingException {
-//         urlUnderTest = "https://common-logon-dev.hlth.gov.bc.ca/ldap/users";
-        urlUnderTest = "http://localhost:" + port + "/users";
+         urlUnderTest = "https://common-logon-dev.hlth.gov.bc.ca/ldap/users";
+//        urlUnderTest = "http://localhost:" + port + "/users";
         if (runOnce) {
             SearchResult searchResult = searchUser(USERNAME);
             unlockUserAccount(searchResult.getName() + "," + LDAP_SEARCH_BASE);

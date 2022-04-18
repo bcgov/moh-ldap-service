@@ -48,13 +48,9 @@ public class UserService {
 
         if (userUnlocked) {
             validCredentials = ldapService.authenticateUser(userInfo.getName(), userCredentials.getPassword());
-
-            if (!validCredentials) {
-                userUnlocked = !updateUserFailedLoginAttempts(userInfo.getName());
-            }
-
             // Get nbLoginAttempts and lockoutTimeOut after authenticateUser
             if (!validCredentials) {
+                userUnlocked = !updateUserFailedLoginAttempts(userInfo.getName());
                 LoginAttempts loginAttemptsForUser = loginAttemptsMap.get(userInfo.getName());
                 if (loginAttemptsForUser != null) {
                     remainingAttempts = 3 - loginAttemptsForUser.getAttempts();
