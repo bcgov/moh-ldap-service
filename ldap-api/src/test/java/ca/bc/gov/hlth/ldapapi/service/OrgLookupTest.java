@@ -35,8 +35,13 @@ class OrgLookupTest {
     }
 
     @Test
+    public void determineOrg_badOrgFormat() {
+        assertThrows(IllegalArgumentException.class, () -> orgLookup.determineOrgJsonFromLdapUserName("uid=1-primehcimintegrationtest,o=badOrgFormat"));
+    }
+
+    @Test
     public void determineOrg_orgDoesNotExist() {
-        assertThrows(IllegalStateException.class, () -> orgLookup.determineOrgJsonFromLdapUserName("uid=1-primehcimintegrationtest,o=DoesNotExist"));
+        assertThrows(IllegalArgumentException.class, () -> orgLookup.determineOrgJsonFromLdapUserName("uid=1-primehcimintegrationtest,o=99999999"));
     }
 
 }

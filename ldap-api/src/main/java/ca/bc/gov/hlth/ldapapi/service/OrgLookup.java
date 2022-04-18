@@ -1,5 +1,7 @@
 package ca.bc.gov.hlth.ldapapi.service;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
@@ -17,9 +19,17 @@ public class OrgLookup {
     private final Map<String, String> orgs = new HashMap<>();
     private final RestTemplate restTemplate = new RestTemplate();
     private static final Pattern orgIdPattern = Pattern.compile("o=(\\d{8})");
+    private final String organizationJsonUrl;
+
+    private final Logger logger = LoggerFactory.getLogger(OrgLookup.class);
 
     public OrgLookup(@Value("${organizationJsonUrl}") String organizationJsonUrl) {
-        List<Map<String, String>> orgList = restTemplate.getForObject(organizationJsonUrl, List.class);
+        this.organizationJsonUrl = organizationJsonUrl;
+        init();
+    }
+
+    private synchronized void init() {
+        List<Map<String, String>> orgList = restTemplate.getForObject(this.organizationJsonUrl, List.class);
         orgList.forEach(org -> orgs.put(org.get("id"), org.get("name")));
     }
 
@@ -36,10 +46,15 @@ public class OrgLookup {
     Map<String, String> determineOrgJsonFromLdapUserName(String userName) {
 
         String orgId = parseOrgId(userName)
-                .orElseThrow(() -> new IllegalStateException(String.format("Could not find organization ID in userName: '%s'", userName)));
+                .orElseThrow(() -> new IllegalArgumentException(String.format("Could not find organization ID in userName: '%s'", userName)));
 
-        String orgName = lookup(orgId).orElseThrow(
-                () -> new IllegalStateException(String.format("Could not find organization name for ID: '%s'", orgId))
+        Optional<String> possiblyOrg = lookup(orgId);
+        if (!possiblyOrg.isPresent()) {
+            logger.warn("Organization '{}' not found. Reloading orgs from '{}'.", orgId, organizationJsonUrl);
+            init();
+        }
+        String orgName = possiblyOrg.orElseThrow(
+                () -> new IllegalArgumentException(String.format("Could not find organization name for ID: '%s'", orgId))
         );
 
         Map<String, String> org = new HashMap<>();
