@@ -31,13 +31,13 @@ class UsersControllerTest {
     private TestRestTemplate restTemplate;
 
     @Autowired
-    Properties ldapProperties;
+    private Properties ldapProperties;
 
     @Value("${LDAP_API_INTEGRATION_TEST_PASSWORD}")
-    String PASSWORD;
+    private String PASSWORD;
 
     // Unlocked, has role
-    public static final String USERNAME = "1-primehcimintegrationtest";
+    private static final String USERNAME = "1-primehcimintegrationtest";
     // Locked, no role
     private static final String USERNAME2 = "2-primehcimintegrationtest";
     // Unlocked, has role, is "Ministry of Health" organization (requires translation to "00000010").
