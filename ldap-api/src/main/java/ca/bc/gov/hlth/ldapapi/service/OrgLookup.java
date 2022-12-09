@@ -52,6 +52,7 @@ public class OrgLookup {
         if (!possiblyOrg.isPresent()) {
             logger.warn("Organization '{}' not found. Reloading orgs from '{}'.", orgId, organizationJsonUrl);
             init();
+            possiblyOrg = lookup(orgId); // Try another lookup attempt following org reload
         }
         String orgName = possiblyOrg.orElseThrow(
                 () -> new IllegalArgumentException(String.format("Could not find organization name for ID: '%s'", orgId))
