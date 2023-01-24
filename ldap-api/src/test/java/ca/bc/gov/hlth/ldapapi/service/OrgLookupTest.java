@@ -1,6 +1,7 @@
 package ca.bc.gov.hlth.ldapapi.service;
 
 import ca.bc.gov.hlth.ldapapi.OrganizationsConfiguration;
+import ca.bc.gov.hlth.ldapapi.RestTemplateConfiguration;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
@@ -23,18 +24,30 @@ class OrgLookupTest {
     private String clientSecret;
     @Value("${organizationJsonUrl}")
     private String organizationJsonUrl;
+
+    @Value("${proxy.type}")
+    private String proxyType;
+
+    @Value("${proxy.host}")
+    private String proxyHost;
+
+    @Value("${proxy.port}")
+    private int proxyPort;
+
+    private RestTemplateConfiguration restTemplateConfiguration;
     private OrganizationsConfiguration organizationsConfiguration;
     private OrgLookup orgLookup;
 
     @BeforeAll
     public void setup() {
+        restTemplateConfiguration = new RestTemplateConfiguration(proxyType, proxyHost, proxyPort);
         organizationsConfiguration = new OrganizationsConfiguration(
                 keycloakTokenUri,
                 clientId,
                 clientSecret,
                 organizationJsonUrl
         );
-        orgLookup = new OrgLookup(organizationsConfiguration);
+        orgLookup = new OrgLookup(restTemplateConfiguration, organizationsConfiguration);
     }
 
 

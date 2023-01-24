@@ -1,6 +1,7 @@
 package ca.bc.gov.hlth.ldapapi.service;
 
 import ca.bc.gov.hlth.ldapapi.OrganizationsConfiguration;
+import ca.bc.gov.hlth.ldapapi.RestTemplateConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,15 +20,17 @@ import java.util.regex.Pattern;
 public class OrgLookup {
 
     private final Map<String, String> orgs = new HashMap<>();
-    private final RestTemplate restTemplate = new RestTemplate();
     private static final Pattern orgIdPattern = Pattern.compile("o=(\\d{8})");
-
     private final Logger logger = LoggerFactory.getLogger(OrgLookup.class);
+
+    @Autowired
+    private final RestTemplateConfiguration restTemplateConfiguration;
 
     @Autowired
     private final OrganizationsConfiguration organizationsConfiguration;
 
-    public OrgLookup(OrganizationsConfiguration organizationsConfiguration){
+    public OrgLookup(RestTemplateConfiguration restTemplateConfiguration, OrganizationsConfiguration organizationsConfiguration){
+        this.restTemplateConfiguration = restTemplateConfiguration;
         this.organizationsConfiguration = organizationsConfiguration;
         init();
     }
@@ -38,7 +41,9 @@ public class OrgLookup {
         headers.set("Authorization", "Bearer " + getKeycloakAccessToken());
         HttpEntity<String> entity = new HttpEntity<>(headers);
 
-        ResponseEntity<List> response = restTemplate.exchange(organizationsConfiguration.getOrganizationJsonUrl(), HttpMethod.GET, entity, List.class);
+
+        RestTemplate orgApiRestTemplate = restTemplateConfiguration.getProxyRestTemplate();
+        ResponseEntity<List> response = orgApiRestTemplate.exchange(organizationsConfiguration.getOrganizationJsonUrl(), HttpMethod.GET, entity, List.class);
         List<Map<String, String>> orgList = response.getBody();
         orgList.forEach(org -> orgs.put(org.get("organizationId"), org.get("name")));
     }
@@ -85,7 +90,8 @@ public class OrgLookup {
 
         HttpEntity<MultiValueMap<String, String>> entity = new HttpEntity<>(credentialsMap, headers);
 
-        ResponseEntity<Object> response = restTemplate.exchange(organizationsConfiguration.getKeycloakTokenUri(), HttpMethod.POST, entity, Object.class);
+        RestTemplate keycloakRestTemplate = restTemplateConfiguration.getNonProxyRestTemplate();
+        ResponseEntity<Object> response = keycloakRestTemplate.exchange(organizationsConfiguration.getKeycloakTokenUri(), HttpMethod.POST, entity, Object.class);
         LinkedHashMap<String, Object> responseBody = (LinkedHashMap<String, Object>)response.getBody();
 
         return (String)responseBody.get("access_token");
