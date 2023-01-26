@@ -1,36 +1,51 @@
 package ca.bc.gov.hlth.ldapapi.service;
 
+import ca.bc.gov.hlth.ldapapi.OrganizationsConfiguration;
+import ca.bc.gov.hlth.ldapapi.RestTemplateConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.*;
 import org.springframework.stereotype.Service;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
 
 @Service
 public class OrgLookup {
 
     private final Map<String, String> orgs = new HashMap<>();
-    private final RestTemplate restTemplate = new RestTemplate();
     private static final Pattern orgIdPattern = Pattern.compile("o=(\\d{8})");
-    private final String organizationJsonUrl;
-
     private final Logger logger = LoggerFactory.getLogger(OrgLookup.class);
 
-    public OrgLookup(@Value("${organizationJsonUrl}") String organizationJsonUrl) {
-        this.organizationJsonUrl = organizationJsonUrl;
+    @Autowired
+    private final RestTemplateConfiguration restTemplateConfiguration;
+
+    @Autowired
+    private final OrganizationsConfiguration organizationsConfiguration;
+
+    public OrgLookup(RestTemplateConfiguration restTemplateConfiguration, OrganizationsConfiguration organizationsConfiguration){
+        this.restTemplateConfiguration = restTemplateConfiguration;
+        this.organizationsConfiguration = organizationsConfiguration;
         init();
     }
 
     private synchronized void init() {
-        List<Map<String, String>> orgList = restTemplate.getForObject(this.organizationJsonUrl, List.class);
-        orgList.forEach(org -> orgs.put(org.get("id"), org.get("name")));
+        HttpHeaders headers = new HttpHeaders();
+
+        headers.set("Authorization", "Bearer " + getKeycloakAccessToken());
+        HttpEntity<String> entity = new HttpEntity<>(headers);
+
+
+        RestTemplate orgApiRestTemplate = restTemplateConfiguration.getProxyRestTemplate();
+        ResponseEntity<List> response = orgApiRestTemplate.exchange(organizationsConfiguration.getOrganizationJsonUrl(), HttpMethod.GET, entity, List.class);
+        List<Map<String, String>> orgList = response.getBody();
+        orgList.forEach(org -> orgs.put(org.get("organizationId"), org.get("name")));
     }
 
     /**
@@ -50,7 +65,7 @@ public class OrgLookup {
 
         Optional<String> possiblyOrg = lookup(orgId);
         if (!possiblyOrg.isPresent()) {
-            logger.warn("Organization '{}' not found. Reloading orgs from '{}'.", orgId, organizationJsonUrl);
+            logger.warn("Organization '{}' not found. Reloading orgs from '{}'.", orgId, organizationsConfiguration.getOrganizationJsonUrl());
             init();
             possiblyOrg = lookup(orgId); // Try another lookup attempt following org reload
         }
@@ -66,6 +81,37 @@ public class OrgLookup {
 
     private Optional<String> lookup(String orgid) {
         return Optional.ofNullable(orgs.get(orgid));
+    }
+
+    private String getKeycloakAccessToken() {
+
+        HttpHeaders headers = setRequestHeaders();
+        MultiValueMap<String, String> credentialsMap = setRequestCredentials();
+
+        HttpEntity<MultiValueMap<String, String>> entity = new HttpEntity<>(credentialsMap, headers);
+
+        RestTemplate keycloakRestTemplate = restTemplateConfiguration.getNonProxyRestTemplate();
+        ResponseEntity<Object> response = keycloakRestTemplate.exchange(organizationsConfiguration.getKeycloakTokenUri(), HttpMethod.POST, entity, Object.class);
+        LinkedHashMap<String, Object> responseBody = (LinkedHashMap<String, Object>)response.getBody();
+
+        return (String)responseBody.get("access_token");
+    }
+
+    private HttpHeaders setRequestHeaders(){
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+        headers.set("Content-Type", "application/x-www-form-urlencoded");
+        headers.set("Cache-Control", "no-cache");
+        headers.set("Accept", "application/json");
+        return headers;
+    }
+
+    private MultiValueMap<String, String> setRequestCredentials(){
+        MultiValueMap<String, String> credentialsMap = new LinkedMultiValueMap<>();
+        credentialsMap.add("grant_type", "client_credentials");
+        credentialsMap.add("client_id", organizationsConfiguration.getClientId());
+        credentialsMap.add("client_secret", organizationsConfiguration.getClientSecret());
+        return credentialsMap;
     }
 
     private static Optional<String> parseOrgId(String userName) {

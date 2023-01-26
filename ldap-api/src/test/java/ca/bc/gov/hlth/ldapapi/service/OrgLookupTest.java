@@ -1,20 +1,55 @@
 package ca.bc.gov.hlth.ldapapi.service;
 
+import ca.bc.gov.hlth.ldapapi.OrganizationsConfiguration;
+import ca.bc.gov.hlth.ldapapi.RestTemplateConfiguration;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.test.context.SpringBootTest;
 
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+@SpringBootTest
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class OrgLookupTest {
 
-    private static OrgLookup orgLookup;
+    @Value("${keycloak.token-uri}")
+    private String keycloakTokenUri;
+    @Value("${keycloak.client-id}")
+    private String clientId;
+    @Value("${keycloak.client-secret}")
+    private String clientSecret;
+    @Value("${organizationJsonUrl}")
+    private String organizationJsonUrl;
+
+    @Value("${proxy.type}")
+    private String proxyType;
+
+    @Value("${proxy.host}")
+    private String proxyHost;
+
+    @Value("${proxy.port}")
+    private int proxyPort;
+
+    private RestTemplateConfiguration restTemplateConfiguration;
+    private OrganizationsConfiguration organizationsConfiguration;
+    private OrgLookup orgLookup;
 
     @BeforeAll
-    static void setUp() {
-        orgLookup = new OrgLookup("https://user-management-dev.hlth.gov.bc.ca/organizations.json");
+    public void setup() {
+        restTemplateConfiguration = new RestTemplateConfiguration(proxyType, proxyHost, proxyPort);
+        organizationsConfiguration = new OrganizationsConfiguration(
+                keycloakTokenUri,
+                clientId,
+                clientSecret,
+                organizationJsonUrl
+        );
+        orgLookup = new OrgLookup(restTemplateConfiguration, organizationsConfiguration);
     }
+
 
     @Test
     public void determineOrg_moh() {
@@ -27,10 +62,10 @@ class OrgLookupTest {
 
     @Test
     public void determineOrg_standardEightDigit() {
-        Map<String, String> map = orgLookup.determineOrgJsonFromLdapUserName("uid=1-primehcimintegrationtest,o=00002855");
+        Map<String, String> map = orgLookup.determineOrgJsonFromLdapUserName("uid=1-primehcimintegrationtest,o=00025379");
         assertAll(
-                () -> assertEquals("00002855", map.get("id"), "id"),
-                () -> assertEquals("PRS BCMOH - Registry Administrator", map.get("name"), "name")
+                () -> assertEquals("00025379", map.get("id"), "id"),
+                () -> assertEquals("Ironwood Clay Company Inc.", map.get("name"), "name")
         );
     }
 
